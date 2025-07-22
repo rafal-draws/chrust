@@ -4,7 +4,7 @@ pub mod db_conn {
 
     use chrono::{Local, NaiveDateTime, Utc};
     use serde::{Deserialize, Serialize};
-    use sqlx::{prelude::FromRow, query, Pool, Postgres};
+    use sqlx::{prelude::FromRow, query, query_unchecked, Pool, Postgres};
     use tracing::info;
     use std::env;
     use uuid::Uuid;
@@ -57,7 +57,7 @@ pub mod db_conn {
 
             let mut tx = pool.begin().await.expect("should create transaction");
             
-            let query = query!(
+            let query = query_unchecked!(
                 r#"INSERT INTO users (username, uuid, created_at) values ($1, $2, CURRENT_TIMESTAMP)"#, &username, &uuid
             )
             .execute(&mut *tx)
@@ -226,7 +226,7 @@ pub mod db_conn {
         info!("Provided upload_uuid{:?}", &upload_uuid);
         info!("Provided file_name: {:?}", &file_name);
         
-        let query = query!(
+        let query = query_unchecked!(
             r#"INSERT INTO uploads (user_uuid, upload_uuid, file_name, added, ready) values ($1, $2, $3, CURRENT_TIMESTAMP, false)"#,
          user_uuid, &upload_uuid, file_name)
         .execute(&mut *tx)

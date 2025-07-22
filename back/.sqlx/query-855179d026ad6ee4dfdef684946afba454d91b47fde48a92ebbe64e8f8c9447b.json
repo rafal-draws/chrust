@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO uploads (user_uuid, upload_uuid, file_name, added, ready) values ($1, $2, $3, CURRENT_TIMESTAMP, false)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "855179d026ad6ee4dfdef684946afba454d91b47fde48a92ebbe64e8f8c9447b"
+}

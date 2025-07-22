@@ -7,9 +7,12 @@ services:
       POSTGRES_PASSWORD: psqlx
       PGDATA: /data/postgres
       POSTGRES_DB: uploads
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     restart: unless-stopped
+    networks:
+      - db
 
 
   redis:
@@ -20,6 +23,8 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    networks:
+      - db
   
   
   backend-etl:
@@ -37,8 +42,22 @@ services:
       - REDIS_PORT=6379
       - REDIS_DB=0
     restart: unless-stopped
+    networks:
+      - db
 
-
+#  backend-rust:
+#    image: backend-rust
+#    container_name: backend-rust
+#    ports:
+#      - "3000:3000"
+#    volumes:
+#      - /server_data:/server_data
+#      - /metadata:/metadata
+#    depends_on:
+#      - backend-etl
+#    restart: unless-stopped
+#    networks:
+#      - db
 
     
 networks:

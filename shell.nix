@@ -35,6 +35,7 @@ let
 	ffmpeg
 
 	docker
+	postgresql
 	
   ]);
   

@@ -16,4 +16,4 @@ docker compose up -d
 
 docker build -t backend-rust back/.
 
-docker run -p 3000:3000 backend-rust
+docker run -p 3000:3000  -v /server_data:/server_data -v /metadata:/util --network masters_db backend-rust

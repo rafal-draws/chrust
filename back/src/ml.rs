@@ -435,15 +435,15 @@ pub mod ml {
 
     pub fn get_cmodule_path(feature_type: &Feature) -> &'static Path {
         match feature_type {
-            Feature::ChromaCens => std::path::Path::new("util/chroma_cens.pt"),
-            Feature::ChromaCqt => std::path::Path::new("util/chroma_cqt.pt"),
-            Feature::ChromaStft => std::path::Path::new("util/chroma_stft.pt"),
-            Feature::Ft => std::path::Path::new("util/ft_model.pt"),
-            Feature::Spectrogram => std::path::Path::new("util/mel_spectrogram_model.pt"),
-            Feature::MelSpectrogram => std::path::Path::new("util/mel_spectrogram_model.pt"),
-            Feature::PowerSpectrogram => std::path::Path::new("util/power_spectrogram_model.pt"),
-            Feature::Mfcc => std::path::Path::new("util/mfcc.pt"),
-            Feature::Tonnetz => std::path::Path::new("util/tonnetz.pt"),
+            Feature::ChromaCens => std::path::Path::new("/util/chroma_cens.pt"),
+            Feature::ChromaCqt => std::path::Path::new("/util/chroma_cqt.pt"),
+            Feature::ChromaStft => std::path::Path::new("/util/chroma_stft.pt"),
+            Feature::Ft => std::path::Path::new("/util/ft_model.pt"),
+            Feature::Spectrogram => std::path::Path::new("/util/mel_spectrogram_model.pt"),
+            Feature::MelSpectrogram => std::path::Path::new("/util/mel_spectrogram_model.pt"),
+            Feature::PowerSpectrogram => std::path::Path::new("/util/power_spectrogram_model.pt"),
+            Feature::Mfcc => std::path::Path::new("/util/mfcc.pt"),
+            Feature::Tonnetz => std::path::Path::new("/util/tonnetz.pt"),
         }
     }
 

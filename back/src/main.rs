@@ -5,6 +5,8 @@ mod http;
 mod ml;
 
 
+use std::env;
+
 use back::config::{self, create_server_data_dirs, create_upload_dir, start_4hourly_task};
 
 use axum::extract::DefaultBodyLimit;
@@ -31,6 +33,7 @@ async fn main() -> Result<(), Box<std::io::Error>> {
     dotenv().ok();
     let subscriber = fmt().with_line_number(true).with_file(true).finish();
 
+    println!("DATABASE IS: {:?}", std::env::var("DATABASE_URL").expect("should exist"));
     tracing::subscriber::set_global_default(subscriber).expect("setting tracing default failed");
     let pool = db_conn::get_pool().await;
 

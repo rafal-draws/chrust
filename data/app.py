@@ -101,6 +101,8 @@ def check_status(track_id: str):
 @app.get("/transform/{song_id}")
 def transform_signal_and_populate_server_data(song_id: str):
 
+    print(f"song_id: {song_id}")
+    print(f"server_data: {server_data}")
 
     hop_size = 2205
     signal_length = 30
@@ -112,8 +114,10 @@ def transform_signal_and_populate_server_data(song_id: str):
     song    = artifacts_gen.validate_audio_files(server_data, song_id)
     r.set(song_id, "2%")
 
+    print(f"song[0]: {song[0]}")
     y       = artifacts_gen.infer_signals(os.path.join(server_data, "uploads", song[0]))
     r.set(song_id, "4%")
+
 
     y_30    = artifacts_gen.extract_y_middle(y, signal_length)
     r.set(song_id, "6%")
