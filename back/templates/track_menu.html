@@ -11,7 +11,6 @@ Track classification!
 
     <div>
         <h2>Classification Results</h2>
-        <h5>{{ upload_name }}</h5>
 
         <h1>Your track was classified as: {{ song_classification_result.major_class }}</h1>
         <div>
@@ -66,20 +65,33 @@ Track classification!
     </div>
 
 
-
     {% for feature in features %}
+    <section class="feature-section">
         <h1>{{ feature.name }}</h1>
-
-        <video width="320" height="240" controls>
+        <video controls>
             <source src="/server_data/{{feature.folder}}/{{upload_name}}/video/{{upload_name}}.mp4" type="video/mp4">
             <source src="movie.ogg" type="video/ogg">
             Your browser does not support the video tag.
-          </video> 
-        
-        <p>
+        </video>
+        <p class="feature-desc">
             {{ feature.short_desc | safe }}
         </p>
-
+        {% if feature.math_formula != "" %}
+            <div class="feature-math">
+                <h3>Formula</h3>
+                <span>{{ feature.math_formula | safe }}</span>
+            </div>
+        {% endif %}
+        {% if feature.math_explanation != "" %}
+            <div class="feature-math">
+                <h3>Explanation</h3>
+                <span>{{ feature.math_explanation | safe }}</span>
+            </div>
+        {% endif %}
+        {% if feature.meta != "" %}
+            <div class="feature-meta">{{ feature.meta | safe }}</div>
+        {% endif %}
+    </section>
     {% endfor %}
 
 
@@ -88,4 +100,5 @@ Track classification!
     <a href="/profile">← Return to dashboard</a>
 
 </body>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 {% endblock %}

@@ -44,32 +44,44 @@
 
         <footer class="site-footer">
             <div class="site-footer__container">
-                <div class="site-footer__logo">
-                    <a href="/" class="logo-link">
-                        <img src="/static/logo.png" alt="Logo" class="logo">
-                        <span>chrust</span>
-                    </a>
+          
+              <!-- Logo -->
+              <div class="site-footer__logo">
+                <a href="/" class="logo-link">
+                  <img src="/static/logo.png" alt="Logo" class="logo">
+                  <span>chrust</span>
+                </a>
+              </div>
+          
+              <!-- Footer Links -->
+              <div class="site-footer__grid">
+                <div class="footer-item">
+                  <a href="https://github.com/rafal-draws/masters" target="_blank" class="explain-link">Backend + Data transformation</a>
                 </div>
-
-                <div class="site-footer__grid">
-                    <div class="footer-item">Github</div>
-
-                    
-                <div class="site-footer__grid">
-                    <div class="footer-item">Terms</div>
-
-                
-                <div class="site-footer__grid">
-                    <div class="footer-item">Contact</div>
-
-
-
-                
-
+                <div class="footer-item">
+                  <a href="https://github.com/rafal-draws/mgr_experimentation" target="_blank" class="explain-link">Machine Learning</a>
                 </div>
+                <div class="footer-item">
+                  <a href="/terms" class="explain-link">Terms of Service</a>
+                </div>
+                <div class="footer-item">
+                  <a href="https://www.linkedin.com/in/rafa%C5%82-draws-a49b0b1a9/" class="explain-link">Contact Us</a>
+                </div>
+              </div>
+          
+              <!-- Dynamic Year -->
+              <div style="text-align:center; margin-top: 2rem; font-size: 0.9rem; color: #777;">
+                &copy; <span id="current-year"></span> chrust — All rights reserved.
+              </div>
+          
             </div>
-        </footer>
+          </footer>
+          
     </div>
 </body>
 
+<script>
+    document.getElementById("current-year").textContent = new Date().getFullYear();
+  </script>
+  
 </html>

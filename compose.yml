@@ -23,6 +23,7 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    restart: unless-stopped
     networks:
       - db
   

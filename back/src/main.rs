@@ -5,7 +5,6 @@ mod http;
 mod ml;
 
 
-use std::env;
 
 use back::config::{self, create_server_data_dirs, create_upload_dir, start_4hourly_task};
 
@@ -21,8 +20,9 @@ use axum::Router;
 use tracing_subscriber::fmt;
 
 use crate::http::handlers::delete::delete_upload;
+use crate::http::handlers::help::help;
 use crate::http::handlers::profile::get_user_data;
-use crate::http::handlers::register::{register_user, user_form, user_registered};
+use crate::http::handlers::register::{register_user, terms_of_use, user_form, user_registered};
 use crate::http::handlers::track_menu::track_menu;
 use crate::http::handlers::upload::upload_track;
 
@@ -72,11 +72,13 @@ fn app() -> Router {
     tracing::info!("SETUP - CREATING ENDPOINTS");
     Router::new()
         .route("/", get(user_form))
+        .route("/terms", get(terms_of_use))
         .route("/register", post(register_user).get(user_registered)) //todo check if register_user is needed
         .route("/profile", get(get_user_data))
         .route("/upload", post(upload_track))
         .route("/delete/{upload_uuid}", post(delete_upload))
         .route("/track/{upload_name}", get(track_menu))
+        .route("/help/{keyword}", get(help))
         
         .nest_service("/server_data", ServeDir::new(
             std::env::var("SERVER_DATA").unwrap()))

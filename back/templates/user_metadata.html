@@ -11,7 +11,7 @@
     <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
         <div class="upload-form__group">
             <label class="upload-form__label">
-                Upload your tune!
+                Upload your track!
                 <input type="file" name="file" multiple class="upload-form__file-input">
             </label>
         </div>
@@ -76,21 +76,17 @@ document.addEventListener("DOMContentLoaded", () => {
             const transformUrl = `http://localhost:8888/transform/${trackId}`;
             const statusDiv = document.getElementById(`status-${uuid}`);
 
-            // Start the transformation (fire-and-forget)
             fetch(transformUrl).catch(err => {
                 console.error("Transform request failed:", err);
             });
 
-            // Disable button while transforming
             button.disabled = true;
             button.innerText = "Transforming...";
 
-            // Start polling for status
             startStatusPolling(trackId, statusDiv);
         });
     });
 
-    // Automatically start polling for all existing uploads
     const statusDivs = document.querySelectorAll(".status");
     statusDivs.forEach(div => {
         const uuid = div.dataset.uuid;
@@ -100,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function startStatusPolling(trackId, statusDiv) {
-    const beginButton = document.getElementById("begin-button"); // Adjust the ID if needed
+    const beginButton = document.getElementById("begin-button"); 
 
     const intervalId = setInterval(() => {
         fetch(`http://localhost:8888/status/${trackId}`)
@@ -109,8 +105,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (statusText.includes("Explore the results")) {
                     statusDiv.innerHTML = statusText;
                     if (beginButton) {
-                        beginButton.disabled = true; // ✅ Disable the button
-                        beginButton.textContent = "Processing complete"; // Optional
+                        beginButton.disabled = true; 
+                        beginButton.textContent = "Processing complete";
                     }
                     clearInterval(intervalId);
                 } else if (statusText.includes("%")) {
@@ -121,9 +117,9 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .catch(err => {
                 console.error("Status check failed:", err);
-                clearInterval(intervalId); // Optional
+                clearInterval(intervalId);
             });
-    }, 2000);
+    }, 500);
 }
 });
 </script>

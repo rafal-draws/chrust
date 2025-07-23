@@ -7,6 +7,7 @@ pub mod profile;
 pub mod register;
 pub mod upload;
 pub mod track_menu;
+pub mod help;
 
 
 

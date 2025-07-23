@@ -128,14 +128,17 @@ pub mod ml {
         }
 
         pub fn get_features_formatted_for_path(&self) -> Vec<FeatureDetail> {
-            
             self.feature_classification_result.iter().map(|f| {
+                let (short_desc, math_formula, math_explanation, meta) = FeatureDetail::provide_details(&f.feature);
                 FeatureDetail {
                     folder: FeatureDetail::get_folder(&f.feature),
                     name: FeatureDetail::get_name(&f.feature),
-                    short_desc: FeatureDetail::provide_details(&f.feature)
+                    short_desc,
+                    math_formula,
+                    math_explanation,
+                    meta
                 }
-        }).collect::<Vec<FeatureDetail>>()
+            }).collect()
 
         }
 
@@ -188,11 +191,211 @@ pub mod ml {
     pub struct FeatureDetail {
         pub folder: String,
         pub name: String,
-        pub short_desc: String
+        pub short_desc: String,
+        pub math_formula: String,
+        pub math_explanation: String,
+        pub meta: String,
     }
 
 
     impl FeatureDetail {
+
+        
+        pub fn provide_details(feature: &Feature) -> (String, String, String, String) {
+            match feature {
+                Feature::Ft => (
+                    r#"
+                        <h2>How STFT Works (Conceptually)</h2>
+                        <ol>
+                            <li>The input audio <a href="/help/signal" class="explain-link" target="_blank" rel="noopener noreferrer">signal</a> is <strong>divided into overlapping frames</strong> using <code>win_length</code> and <code>hop_length</code>.</li>
+                            <li>Each frame is <strong>windowed</strong> using a <a href="/help/window%20function" class="explain-link" target="_blank" rel="noopener noreferrer">window function</a> (e.g., Hann) to reduce edge <a href="/help/artifact" class="explain-link" target="_blank" rel="noopener noreferrer">artifacts</a>.</li>
+                            <li>A <strong>Fast Fourier Transform (FFT)</strong> is applied to each windowed frame to transform it from the <a href="/help/time%20domain" class="explain-link" target="_blank" rel="noopener noreferrer">time domain</a> to the <a href="/help/frequency%20domain" class="explain-link" target="_blank" rel="noopener noreferrer">frequency domain</a>.</li>
+                            <li>The result is a <strong>2D array of complex numbers</strong>:
+                                <ul>
+                                    <li>Each column = <a href="/help/spectrum" class="explain-link" target="_blank" rel="noopener noreferrer">spectrum</a> of a frame</li>
+                                    <li>Each row = specific <a href="/help/frequency" class="explain-link" target="_blank" rel="noopener noreferrer">frequency</a> bin (<a href="/help/amplitude" class="explain-link" target="_blank" rel="noopener noreferrer">amplitude</a> of that frequency over time)</li>
+                                </ul>
+                            </li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                    X(m, k) = \sum_{n=0}^{N-1} x[n + mH] \cdot w[n] \cdot e^{-j 2\pi k n / N}
+                    $$
+                "#.to_string(),
+                    r#"Explanation of the formula:<br>
+<ul>
+    <li><code>X(m, k)</code>: the result of the STFT — it tells us how much of a certain sound frequency (<code>k</code>) is present at a certain moment in time (<code>m</code>). It's like asking: \"Is there a lot of bass here? How about high notes?\"</li>
+    
+    <li><code>x[n]</code>: the original sound signal. Imagine it like a long row of tiny Lego bricks, where each brick is a number showing how loud the sound was at a very tiny moment in time.</li>
+    
+    <li><code>m</code>: the frame number. We can't look at the whole sound at once, so we cut it into little overlapping chunks. Each chunk is one frame. <code>m</code> tells us which chunk we’re on.</li>
+    
+    <li><code>H</code>: the hop length. This says how far we move forward each time we take a new chunk. If <code>H</code> is small, the chunks overlap a lot (like flipping pages slowly). If it’s big, we skip more (like flipping pages fast).</li>
+    
+    <li><code>n</code>: a counter that goes through each sample inside one chunk (frame). It's like counting Lego bricks in just one frame.</li>
+    
+    <li><code>N</code>: the size of each chunk — how many Lego bricks are in one frame. All frames usually have the same size.</li>
+    
+    <li><code>w[n]</code>: the window function. We gently fade the edges of each chunk so the analysis is smoother. Without it, the cuts between chunks would sound \"sharp\" or unnatural. It’s like softening the ends of each frame so they blend better.</li>
+    
+    <li><code>e<sup>−j2πkn/N</sup></code>: this part turns the sound chunk into frequency information. It's a special math swirl (called a complex exponential) that spins around and checks: \"Is there a wave with frequency <code>k</code> here?\" It’s the magic that helps us move from time to frequency.</li>
+    
+    <li><strong>The whole sum (∑)</strong>: adds up all the tiny parts in the chunk to figure out how strong frequency <code>k</code> is in this time frame <code>m</code>.</li>
+</ul>"#.to_string(),
+                    r#"
+                    You're slicing a song into little pieces (frames), smoothing them (window), and asking:<br><br>
+                    <pre>
+                       "How much of each sound (frequency) is in this slice";
+                    </pre>
+                    <br>
+                    The math is doing that over and over, very quickly, and storing the answers in a grid - with <strong>time</strong> on one axis, and <strong>frequency</strong> on the other.
+                    "#
+.to_string()
+                ),
+                Feature::ChromaCens => (
+                    r#"
+                        <h2>Chroma CENS (Chroma Energy Normalized Statistics)</h2>
+                        <ol>
+                        <li>Reduces pitch information into <strong>12 chroma bins</strong> (one per pitch class: C, C#, D, etc.), ignoring octave.</li>
+                        <li>Applies <strong>energy normalization</strong> and smoothing over time, making it robust to changes in dynamics and articulation.</li>
+                        <li>Useful for identifying <strong>harmonic patterns</strong> and musical similarity.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        c_t[p] = \mathrm{Normalize}\left(\sum_{k \in K_p} |X_t[k]|\right)
+                        $$
+                    "#.to_string(),
+                    "For each time frame, sum the magnitudes of all frequencies that correspond to the same pitch class (C, C#, ... B), normalize, and optionally smooth the result.".to_string(),
+                    "CENS features are robust to loudness and articulation changes and are used for pattern matching in music.".to_string()
+                ),
+                Feature::Mfcc => (
+                    r#"
+                        <h2>MFCC (Mel-Frequency Cepstral Coefficients)</h2>
+                        <ol>
+                        <li>Transforms audio into a compact representation of its <strong>timbre</strong>.</li>
+                        <li>Steps:
+                            <ul>
+                            <li>Compute Mel Spectrogram (frequency in Mel scale)</li>
+                            <li>Apply log transform (log-mel spectrogram)</li>
+                            <li>Apply Discrete Cosine Transform (DCT) to get decorrelated coefficients</li>
+                            </ul>
+                        </li>
+                        <li>Commonly used in <strong>speech and music classification</strong>.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        \text{MFCC}_n = \sum_{m=1}^{M} \log(S_m) \cdot \cos\left[n\left(m - \frac{1}{2}\right)\frac{\pi}{M}\right]
+                        $$
+                    "#.to_string(),
+                    "Transform the audio to Mel scale, take the log of the energy in each Mel band, then apply a Discrete Cosine Transform (DCT) to decorrelate features.".to_string(),
+                    "MFCCs are a compact, perceptually meaningful representation of timbre, used for audio and speech analysis.".to_string()
+                ),
+                Feature::ChromaCqt => (
+                    r#"
+                        <h2>Chroma CQT (Constant-Q Transform)</h2>
+                        <ol>
+                        <li>Like chroma STFT, but uses a <strong>Constant-Q Transform</strong> instead of FFT.</li>
+                        <li>Each frequency bin is logarithmically spaced — matching musical pitch perception.</li>
+                        <li>Better resolution for <strong>low frequencies</strong>, and pitch-focused tasks.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        X_{CQT}(k, n) = \sum_{m=0}^{N_k-1} x[n - m] \cdot w_k[m] \cdot e^{-j2\pi Q\frac{m}{N_k}}
+                        $$
+                    "#.to_string(),
+                    "Like STFT, but with variable window sizes per frequency bin, giving logarithmic frequency spacing that matches musical notes.".to_string(),
+                    "CQT provides higher resolution for low frequencies and is well-suited for music analysis tasks.".to_string()
+                ),
+                Feature::ChromaStft => (
+                    r#"
+                        <h2>Chroma STFT</h2>
+                        <ol>
+                        <li>Computes <strong>chroma features</strong> (pitch classes) from a standard STFT spectrogram.</li>
+                        <li>Reduces the full frequency spectrum to 12 pitch classes.</li>
+                        <li>Good for analyzing <strong>harmonic content</strong>, chords, or key.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        c_t[p] = \sum_{k \in K_p} |X_t[k]|
+                        $$
+                    "#.to_string(),
+                    "For each frame, sum the amplitudes of all frequencies belonging to the same pitch class.".to_string(),
+                    "Collapses the spectral information into 12 chroma bins, useful for chord or key analysis.".to_string()
+                ),
+                Feature::Spectrogram => (
+                    r#"
+                        <h2>Spectrogram (Magnitude)</h2>
+                        <ol>
+                        <li>Represents the audio signal's <strong>frequency content over time</strong>.</li>
+                        <li>Computed using the <code>STFT</code>, followed by taking the <code>magnitude</code> (i.e., <code>np.abs</code>).</li>
+                        <li>Shows how strong each frequency is at each time step.</li>
+                        <li>Useful for <strong>visual inspection</strong> and signal processing tasks.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        S(m, k) = |X(m, k)|
+                        $$
+                    "#.to_string(),
+                    "Take the magnitude (absolute value) of each complex STFT coefficient.".to_string(),
+                    "Shows energy at each frequency and time; commonly visualized as a heatmap.".to_string()
+                ),
+                Feature::PowerSpectrogram => (
+                    r#"
+                        <h2>Power Spectrogram</h2>
+                        <ol>
+                        <li>Like a regular spectrogram, but instead of magnitude, it uses <strong>power</strong>: <code>np.abs(S)**2</code>.</li>
+                        <li>Gives more weight to strong frequencies — useful for some machine learning tasks.</li>
+                        <li>Can be converted to decibels (log scale) using <code>librosa.power_to_db()</code>.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        P(m, k) = |X(m, k)|^2
+                        $$
+                    "#.to_string(),
+                    "Square the magnitude of each STFT coefficient to get the power at each frequency and time.".to_string(),
+                    "Often converted to decibel (dB) scale for perceptual purposes and feature extraction.".to_string()
+                ),
+                Feature::MelSpectrogram => (
+                    r#"
+                        <h2>Mel Spectrogram</h2>
+                        <ol>
+                        <li>Transforms a power spectrogram into the <strong>Mel scale</strong>, which aligns better with human pitch perception.</li>
+                        <li>More resolution for lower frequencies, less for higher ones — similar to how humans hear.</li>
+                        <li>Used in <strong>audio classification</strong>, music tagging, speech recognition, etc.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        M(m, l) = \sum_{k} H_l[k] \cdot P(m, k)
+                        $$
+                    "#.to_string(),
+                    "Project the power spectrogram onto the Mel scale using a set of triangular filters, each representing a Mel frequency band.".to_string(),
+                    "Mel spectrograms are widely used in speech and music processing due to their perceptual relevance.".to_string()
+                ),
+                Feature::Tonnetz => (
+                    r#"
+                        <h2>Tonnetz (Tonal Centroid Features)</h2>
+                        <ol>
+                        <li>Maps chroma vectors to a 6D space representing <strong>tonal relationships</strong>.</li>
+                        <li>Captures <strong>harmonic structure</strong> (e.g., consonance, mode) using music theory.</li>
+                        <li>Useful for <strong>key detection</strong> and <strong>musical similarity analysis</strong>.</li>
+                        </ol>
+                    "#.to_string(),
+                    r#"$$
+                        \mathbf{t}_t = \mathbf{T} \cdot \mathbf{c}_t
+                        $$
+                    "#.to_string(),
+                    "Map chroma features into a 6-dimensional space representing tonal relationships (e.g., fifths, minor/major).".to_string(),
+                    "Tonnetz is used in music information retrieval for key, mode, and similarity analysis.".to_string()
+                ),
+                _ => (
+                    "No description available.".to_string(),
+                    "".to_string(),
+                    "".to_string(),
+                    "".to_string(),
+                )
+            }
+        }
+    
 
         pub fn get_folder(feature: &Feature) -> String {
             match feature {
@@ -221,108 +424,9 @@ pub mod ml {
                 Feature::Tonnetz => "Tonnetz"
                 }.to_string()
         }
-
-
-        pub fn provide_details(feature: &Feature) -> String {
-            match feature {
-                Feature::Ft => r#"
-                    <h2>How STFT Works (Conceptually)</h2>
-                    <ol>
-                    <li>The input audio signal is <strong>divided into overlapping frames</strong> using <code>win_length</code> and <code>hop_length</code>.</li>
-                    <li>Each frame is <strong>windowed</strong> using a window function (e.g., Hann) to reduce edge artifacts.</li>
-                    <li>A <strong>Fast Fourier Transform (FFT)</strong> is applied to each windowed frame to transform it from the time domain to the frequency domain.</li>
-                    <li>The result is a <strong>2D array of complex numbers</strong>:
-                        <ul>
-                        <li>Each column = spectrum of a frame (frequency content at a point in time)</li>
-                        <li>Each row = specific frequency bin (amplitude of that frequency over time)</li>
-                        </ul>
-                    </li>
-                    </ol>
-                    "#,
-    
-                    Feature::ChromaCens => r#"
-                    <h2>Chroma CENS (Chroma Energy Normalized Statistics)</h2>
-                    <ol>
-                    <li>Reduces pitch information into <strong>12 chroma bins</strong> (one per pitch class: C, C#, D, etc.), ignoring octave.</li>
-                    <li>Applies <strong>energy normalization</strong> and smoothing over time, making it robust to changes in dynamics and articulation.</li>
-                    <li>Useful for identifying <strong>harmonic patterns</strong> and musical similarity.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::Mfcc => r#"
-                    <h2>MFCC (Mel-Frequency Cepstral Coefficients)</h2>
-                    <ol>
-                    <li>Transforms audio into a compact representation of its <strong>timbre</strong>.</li>
-                    <li>Steps:
-                        <ul>
-                        <li>Compute Mel Spectrogram (frequency in Mel scale)</li>
-                        <li>Apply log transform (log-mel spectrogram)</li>
-                        <li>Apply Discrete Cosine Transform (DCT) to get decorrelated coefficients</li>
-                        </ul>
-                    </li>
-                    <li>Commonly used in <strong>speech and music classification</strong>.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::ChromaCqt => r#"
-                    <h2>Chroma CQT (Constant-Q Transform)</h2>
-                    <ol>
-                    <li>Like chroma STFT, but uses a <strong>Constant-Q Transform</strong> instead of FFT.</li>
-                    <li>Each frequency bin is logarithmically spaced — matching musical pitch perception.</li>
-                    <li>Better resolution for <strong>low frequencies</strong>, and pitch-focused tasks.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::ChromaStft => r#"
-                    <h2>Chroma STFT</h2>
-                    <ol>
-                    <li>Computes <strong>chroma features</strong> (pitch classes) from a standard STFT spectrogram.</li>
-                    <li>Reduces the full frequency spectrum to 12 pitch classes.</li>
-                    <li>Good for analyzing <strong>harmonic content</strong>, chords, or key.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::Spectrogram => r#"
-                    <h2>Spectrogram (Magnitude)</h2>
-                    <ol>
-                    <li>Represents the audio signal's <strong>frequency content over time</strong>.</li>
-                    <li>Computed using the <code>STFT</code>, followed by taking the <code>magnitude</code> (i.e., <code>np.abs</code>).</li>
-                    <li>Shows how strong each frequency is at each time step.</li>
-                    <li>Useful for <strong>visual inspection</strong> and signal processing tasks.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::PowerSpectrogram => r#"
-                    <h2>Power Spectrogram</h2>
-                    <ol>
-                    <li>Like a regular spectrogram, but instead of magnitude, it uses <strong>power</strong>: <code>np.abs(S)**2</code>.</li>
-                    <li>Gives more weight to strong frequencies — useful for some machine learning tasks.</li>
-                    <li>Can be converted to decibels (log scale) using <code>librosa.power_to_db()</code>.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::MelSpectrogram => r#"
-                    <h2>Mel Spectrogram</h2>
-                    <ol>
-                    <li>Transforms a power spectrogram into the <strong>Mel scale</strong>, which aligns better with human pitch perception.</li>
-                    <li>More resolution for lower frequencies, less for higher ones — similar to how humans hear.</li>
-                    <li>Used in <strong>audio classification</strong>, music tagging, speech recognition, etc.</li>
-                    </ol>
-                    "#,
-    
-                    Feature::Tonnetz => r#"
-                    <h2>Tonnetz (Tonal Centroid Features)</h2>
-                    <ol>
-                    <li>Maps chroma vectors to a 6D space representing <strong>tonal relationships</strong>.</li>
-                    <li>Captures <strong>harmonic structure</strong> (e.g., consonance, mode) using music theory.</li>
-                    <li>Useful for <strong>key detection</strong> and <strong>musical similarity analysis</strong>.</li>
-                    </ol>
-                    "#,
-                }.to_string()
-            }
-
-
     }
+
+        
 
     impl fmt::Display for FeatureDetail {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -486,6 +590,7 @@ pub mod ml {
         Ok(tensor)
     }
 
+
     pub fn instantiate_models(features: [Feature; 9]) -> HashMap<Feature, CModule> {
         let mut model_hm: HashMap<Feature, CModule> = HashMap::new();
         for feature in features {
@@ -497,6 +602,8 @@ pub mod ml {
         }
         model_hm
     }
+
+    
 
 
 

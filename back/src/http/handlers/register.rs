@@ -55,3 +55,14 @@ use crate::{db::db_conn::User, http::handlers::HtmlTemplate};
             Ok(HtmlTemplate(template))
         }
     }
+
+
+    #[derive(Template)]
+    #[template(path = "terms_of_use.html")]
+    pub struct TermsOfUseTemplate {}
+
+    pub async fn terms_of_use() -> HtmlTemplate<TermsOfUseTemplate> {
+        HtmlTemplate(TermsOfUseTemplate {  })
+    }
+        
+    

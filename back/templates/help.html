@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ title }}
+{% endblock %}
+
+{% block content %}
+
+<div class="feature-section help-container">
+
+    <h1>{{ title }}</h1>
+
+    <section class="help-section">
+        <h2>What is it?</h2>
+        <div class="feature-desc">
+            {{ what | safe }}
+        </div>
+    </section>
+
+    <section class="help-section">
+        <h2>Why is it used?</h2>
+        <div class="feature-desc">
+            {{ why | safe }}
+        </div>
+    </section>
+
+    <section class="help-section">
+        <h2>How is it constructed?</h2>
+        <div class="feature-desc">
+            {{ how | safe }}
+        </div>
+    </section>
+
+    <section class="help-section">
+        <h2>🖼️ Illustrations / Diagrams</h2>
+        <ul>
+            {% for img in image %}
+            <li style="margin-bottom: 1.5rem;">
+                <img src="{{ img.url }}" alt="Help image"
+                    style="max-width: 100%; border-radius: 12px; box-shadow: 0 0 16px rgba(30,144,255,0.1);">
+                <p class="feature-meta">{{ img.caption }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="help-section">
+        <h2>🌐 External Resources</h2>
+        <ul>
+            {% for link in links %}
+            <li>
+                <a class="explain-link" href="{{ link }}" target="_blank" rel="noopener noreferrer">
+                    {{ link }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <div style="margin-top: 2rem;">
+        <a class="btn btn--primary" href="/profile">← Return to dashboard</a>
+    </div>
+</div>
+
+<!-- MathJax for LaTeX rendering -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+{% endblock %}

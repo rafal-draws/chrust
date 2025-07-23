@@ -12,7 +12,7 @@ pub mod config {
     use tokio::time::{sleep_until, Instant};
     use tower_http::cors::CorsLayer;
 
-    use crate::{db::db_conn::drop_all_uploads, ml::ml::Feature};
+    use crate::{db::db_conn::drop_all_uploads};
 
     pub async fn create_upload_dir() {
         let dir_upload = env::var("SERVER_DATA").expect("UPLOADS DIR env var not found");
@@ -113,7 +113,6 @@ pub mod config {
             }
         });
     }
-
 
     
 
