@@ -1,4 +1,4 @@
-# Masters Project
+# Chrust - torCH + RUST
 
 This repository contains two major components housed in `/back` and `/data`, each containerized for portability and ease of deployment.
 
@@ -51,24 +51,6 @@ This repository is designed with containerization in mind, using Docker for both
   - Builds the project using `cargo`.
 - **Entrypoint:** Runs the Rust backend binary.
 
-**Dockerfile Summary:**
-```dockerfile
-FROM rust:1.87
-WORKDIR /usr/src/myapp
-COPY . .
-RUN apt-get update && apt-get install -y dos2unix 
-RUN dos2unix libtorch_setup.sh
-RUN bash ./libtorch_setup.sh
-ENV LIBTORCH=/home/util/libtorch/libtorch
-ENV LIBTORCH_INCLUDE=/home/util/libtorch/libtorch
-ENV LIBTORCH_LIB=/home/util/libtorch/libtorch
-ENV LD_LIBRARY_PATH=/home/util/libtorch/libtorch/lib:$LD_LIBRARY_PATH
-RUN cargo install sqlx-cli
-RUN sqlx migrate run
-RUN cargo build
-CMD ["./target/debug/back"]
-```
-
 ### Data Service (Python/FastAPI)
 
 - **Base Image:** `python:3.12`
@@ -78,19 +60,6 @@ CMD ["./target/debug/back"]
   - Copies all source files.
   - Installs `ffmpeg` for media processing.
 - **Entrypoint:** Launches the FastAPI application on port 8888.
-
-**Dockerfile Summary:**
-```dockerfile
-FROM python:3.12
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir  -r requirements.txt
-COPY . .
-RUN apt update
-RUN  apt install -y ffmpeg
-CMD ["fastapi", "run", "app.py", "--port", "8888"]
-```
-
 ---
 
 ## How to Build and Run
