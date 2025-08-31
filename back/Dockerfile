@@ -4,7 +4,6 @@ WORKDIR /usr/src/myapp
 
 COPY . .
 
-COPY /util /util
 
 RUN apt-get update && apt-get install -y dos2unix
 
@@ -19,7 +18,7 @@ ENV LD_LIBRARY_PATH=$LIBTORCH/lib:/usr/local/lib:/usr/lib
 ENV DATABASE_URL=postgres://psqlx:psqlx@postgres:5432/uploads
 ENV SQLX_OFFLINE=true
 ENV SERVER_DATA=/server_data
-ENV UTIL=/util
+ENV UTIL=/metadata
 
 
 RUN cargo build
