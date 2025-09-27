@@ -1,14 +1,6 @@
 #[allow(unused)]
 pub mod ml {
 
-    // TODO
-    //    http:
-    //    - classification results
-    //    - model used and training data
-    //    - h ow classification was doen
-    //    - what the feature is
-    //    - how the feature was extracted
-
     use std::{
         collections::{BTreeMap, HashMap, HashSet},
         error::Error,
