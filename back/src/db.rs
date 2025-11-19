@@ -1,10 +1,9 @@
-
 #[allow(unused)]
 pub mod db_conn {
 
     use chrono::{Local, NaiveDateTime, Utc};
     use serde::{Deserialize, Serialize};
-    use sqlx::{prelude::FromRow, query, query_unchecked, Pool, Postgres};
+    use sqlx::{prelude::FromRow, query, query_as, Pool, Postgres};
     use tracing::info;
     use std::env;
     use uuid::Uuid;
@@ -57,9 +56,11 @@ pub mod db_conn {
 
             let mut tx = pool.begin().await.expect("should create transaction");
             
-            let query = query_unchecked!(
-                r#"INSERT INTO users (username, uuid, created_at) values ($1, $2, CURRENT_TIMESTAMP)"#, &username, &uuid
+            let query = query(
+                r#"INSERT INTO users (username, uuid, created_at) values ($1, $2, CURRENT_TIMESTAMP)"#
             )
+            .bind(&username)
+            .bind(&uuid)
             .execute(&mut *tx)
             .await
             .expect("Should execute transaction creating a user");
@@ -226,9 +227,12 @@ pub mod db_conn {
         info!("Provided upload_uuid{:?}", &upload_uuid);
         info!("Provided file_name: {:?}", &file_name);
         
-        let query = query_unchecked!(
-            r#"INSERT INTO uploads (user_uuid, upload_uuid, file_name, added, ready) values ($1, $2, $3, CURRENT_TIMESTAMP, false)"#,
-         user_uuid, &upload_uuid, file_name)
+        let query = query(
+            r#"INSERT INTO uploads (user_uuid, upload_uuid, file_name, added, ready) values ($1, $2, $3, CURRENT_TIMESTAMP, false)"#
+        )
+        .bind(user_uuid)
+        .bind(&upload_uuid)
+        .bind(file_name)
         .execute(&mut *tx)
         .await
         .expect(&format!("Should insert record for {} {}", user_uuid, file_name));

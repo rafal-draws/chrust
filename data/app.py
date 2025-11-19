@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException, Header, Response
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from server_utils import artifacts_gen
 
@@ -92,189 +94,305 @@ def check_status(track_id: str):
 
     if status_progress == None:
         return "Transformation not started!"
-    if not status_progress == "100%":
-        return status_progress
+    
+    # Handle both old format ("100%") and new format ("100")
+    if status_progress.startswith("ERROR"):
+        return f"<div style='color: red;'>{status_progress}</div>"
+    
+    # Convert to int to compare
+    try:
+        progress_int = int(status_progress.replace("%", ""))
+    except ValueError:
+        return f"<div style='color: orange;'>Unknown status: {status_progress}</div>"
+    
+    if progress_int < 100:
+        return f"{progress_int}%"
     else:
         html = f'<div><a href="/track/{track_id}"><button>Explore the results!</button></a></div>'
         return html
 
 @app.get("/transform/{song_id}")
-def transform_signal_and_populate_server_data(song_id: str):
-
+async def transform_signal_and_populate_server_data(song_id: str):
+    """
+    Async version that parallelizes all 9 independent transformations after preprocessing.
+    Sequential phase: load audio → extract → split frames (0-10%)
+    Parallel phase: all 9 transformations run concurrently (10-100%, ~10% each)
+    """
     print(f"song_id: {song_id}")
     print(f"server_data: {server_data}")
 
     hop_size = 2205
     signal_length = 30
-
     generate_video = True
     generate_features = True
 
-    
-    song    = artifacts_gen.validate_audio_files(server_data, song_id)
-    r.set(song_id, "2%")
-
-    print(f"song[0]: {song[0]}")
-    y       = artifacts_gen.infer_signals(os.path.join(server_data, "uploads", song[0]))
-    r.set(song_id, "4%")
-
-
-    y_30    = artifacts_gen.extract_y_middle(y, signal_length)
-    r.set(song_id, "6%")
-
-    sample_location = artifacts_gen.generate_audio_from_frames(song_id, y_30, 22050, server_data)
-    r.set(song_id, "8%")
-    
-    y = artifacts_gen.split_to_frames(y_30, frame_length=22050, hop_length=hop_size)
-    r.set(song_id, "10%")
-
-    frames_ft = artifacts_gen.transform_to_ft(y, metadata, True)
-    r.set(song_id, "12%")
-
-    if generate_video:
-        artifacts_gen.generate_ft_graphs(frames_ft, server_data, song_id)
-        r.set(song_id, "14%")
-        artifacts_gen.generate_video(server_data, song_id, "ft", sample_location)
-        r.set(song_id, "16%")
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("ft", server_data, song_id, frames_ft) 
-        r.set(song_id, "18%")
-    
-    # saving the planet
-    del frames_ft
-    
-    # op7
-    spectr_normalized = artifacts_gen.transform_to_spectr(y, metadata, True)
-    r.set(song_id, "20%")
-
-    if generate_video:
-        artifacts_gen.generate_spectrogram_graphs(spectr_normalized, server_data ,song_id)
-        r.set(song_id, "22%")
-        artifacts_gen.generate_video(server_data, song_id, "spectr", sample_location)
-        r.set(song_id, "24%")   
-    
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("spectr", server_data, song_id, spectr_normalized)
-        r.set(song_id, "26%")
-    del spectr_normalized
-
-    # op8
-    mel_spectr_normalized = artifacts_gen.transform_to_mel_spectr(y, metadata, True)
-    r.set(song_id, "28%")
-
-    if generate_video:
-
-        artifacts_gen.generate_mel_spectrogram_graphs(mel_spectr_normalized, server_data, song_id)
-        r.set(song_id, "30%")
+    try:
+        loop = asyncio.get_event_loop()
         
-        artifacts_gen.generate_video(server_data, song_id, "mel_spectr", sample_location)
-        r.set(song_id, "32%")
+        # Initialize progress tracking
+        r.set(song_id, "0")
+        
+        # Phase 1: Sequential preprocessing (must happen in order)
+        song = await loop.run_in_executor(None, artifacts_gen.validate_audio_files, server_data, song_id)
+        r.set(song_id, "2")
 
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("mel_spectr", server_data, song_id, mel_spectr_normalized)
-        r.set(song_id, "34%")
+        print(f"song[0]: {song[0]}")
+        y = await loop.run_in_executor(None, artifacts_gen.infer_signals, os.path.join(server_data, "uploads", song[0]))
+        r.set(song_id, "4")
 
-    del mel_spectr_normalized
-    
-    # op9
-    power_spectr_normalized = artifacts_gen.transform_to_power_spectr(y, metadata, True)
-    r.set(song_id, "36%")
+        y_30 = await loop.run_in_executor(None, artifacts_gen.extract_y_middle, y, signal_length)
+        r.set(song_id, "6")
 
-    if generate_features:
+        sample_location = await loop.run_in_executor(None, artifacts_gen.generate_audio_from_frames, song_id, y_30, 22050, server_data)
+        r.set(song_id, "8")
+        
+        y_frames = await loop.run_in_executor(None, artifacts_gen.split_to_frames, y_30, 22050, hop_size)
+        r.set(song_id, "10")
+
+        # Phase 2: Parallel transformations (all run concurrently)
+        # Each task contributes ~10% to progress (10% → 100%)
+        async def process_ft():
+            try:
+                frames_ft = await loop.run_in_executor(None, artifacts_gen.transform_to_ft, y_frames, metadata, True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
                 
-        artifacts_gen.generate_power_spectrogram_graphs(power_spectr_normalized, server_data, song_id)
-        r.set(song_id, "38%")
-        artifacts_gen.generate_video(server_data, song_id, "power_spectr", sample_location)
-        r.set(song_id, "40%")
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_ft_graphs, frames_ft, server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "ft", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
+                
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "ft", server_data, song_id, frames_ft)
+                
+                del frames_ft
+                return "ft_complete"
+            except Exception as e:
+                print(f"Error in process_ft: {e}")
+                raise
 
-    if generate_features:
+        async def process_spectr():
+            try:
+                spectr_normalized = await loop.run_in_executor(None, artifacts_gen.transform_to_spectr, y_frames, metadata, True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
 
-        artifacts_gen.save_feature_to_server_data("power_spectr", server_data, song_id, power_spectr_normalized)
-        r.set(song_id, "42%")
-    del power_spectr_normalized
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_spectrogram_graphs, spectr_normalized, server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "spectr", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
+                
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "spectr", server_data, song_id, spectr_normalized)
+                
+                del spectr_normalized
+                return "spectr_complete"
+            except Exception as e:
+                print(f"Error in process_spectr: {e}")
+                raise
 
-    
-    # op 10
-    mfcc_normalized = artifacts_gen.transform_to_mfcc(y, metadata, True)
-    r.set(song_id, "44%")
+        async def process_mel_spectr():
+            try:
+                mel_spectr_normalized = await loop.run_in_executor(None, artifacts_gen.transform_to_mel_spectr, y_frames, metadata, True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
 
-    if generate_video:
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_mel_spectrogram_graphs, mel_spectr_normalized, server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "mel_spectr", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
 
-        artifacts_gen.generate_mfcc_graphs(mfcc_normalized, server_data, song_id)
-        r.set(song_id, "46%")
-        artifacts_gen.generate_video(server_data, song_id, "mfcc", sample_location)
-        r.set(song_id, "48%")
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "mel_spectr", server_data, song_id, mel_spectr_normalized)
 
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("mfcc", server_data, song_id, mfcc_normalized)
-        r.set(song_id, "50%")
+                del mel_spectr_normalized
+                return "mel_spectr_complete"
+            except Exception as e:
+                print(f"Error in process_mel_spectr: {e}")
+                raise
 
-    del mfcc_normalized
+        async def process_power_spectr():
+            try:
+                power_spectr_normalized = await loop.run_in_executor(None, artifacts_gen.transform_to_power_spectr, y_frames, metadata, True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
 
-    # op 11
-    normalized_chroma_stft = artifacts_gen.transform_to_chroma(y, metadata,  "stft", True)
-    r.set(song_id, "52%")
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_power_spectrogram_graphs, power_spectr_normalized, server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "power_spectr", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
 
-    if generate_video:
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "power_spectr", server_data, song_id, power_spectr_normalized)
+                
+                del power_spectr_normalized
+                return "power_spectr_complete"
+            except Exception as e:
+                print(f"Error in process_power_spectr: {e}")
+                raise
 
-        artifacts_gen.generate_chroma_graphs(normalized_chroma_stft, "stft", server_data, song_id)
-        r.set(song_id, "54%")
-        artifacts_gen.generate_video(server_data, song_id, "stft", sample_location)
-        r.set(song_id, "56%")
+        async def process_mfcc():
+            try:
+                mfcc_normalized = await loop.run_in_executor(None, artifacts_gen.transform_to_mfcc, y_frames, metadata, True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
 
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("chroma_stft", server_data, song_id, normalized_chroma_stft)
-        r.set(song_id, "58%")
-    del normalized_chroma_stft
-    
-    # op 12
-    normalized_chroma_cens = artifacts_gen.transform_to_chroma(y, metadata,  "cens", True)
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_mfcc_graphs, mfcc_normalized, server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "mfcc", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
 
-    if generate_video:
-        r.set(song_id, "60%")
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "mfcc", server_data, song_id, mfcc_normalized)
 
-        artifacts_gen.generate_chroma_graphs(normalized_chroma_cens, "cens", server_data, song_id)
-        r.set(song_id, "62%")
-        artifacts_gen.generate_video(server_data, song_id, "cens", sample_location)
-        r.set(song_id, "64%")
+                del mfcc_normalized
+                return "mfcc_complete"
+            except Exception as e:
+                print(f"Error in process_mfcc: {e}")
+                raise
 
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("chroma_cens", server_data, song_id, normalized_chroma_cens)
-        r.set(song_id, "66%")
-    del normalized_chroma_cens
-    
-    # op 13
-    normalized_chroma_cqt = artifacts_gen.transform_to_chroma(y, metadata,  "cqt", True)
-    r.set(song_id, "68%")
+        async def process_chroma_stft():
+            try:
+                normalized_chroma_stft = await loop.run_in_executor(None, artifacts_gen.transform_to_chroma, y_frames, metadata, "stft", True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
 
-    if generate_video:
-        artifacts_gen.generate_chroma_graphs(normalized_chroma_cqt, "cqt", server_data, song_id)
-        r.set(song_id, "70%")
-        artifacts_gen.generate_video(server_data, song_id, "cqt", sample_location)
-        r.set(song_id, "72%")
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_chroma_graphs, normalized_chroma_stft, "stft", server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "stft", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
 
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("chroma_cqt", server_data, song_id, normalized_chroma_cqt)
-        r.set(song_id, "74%")
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "chroma_stft", server_data, song_id, normalized_chroma_stft)
+                
+                del normalized_chroma_stft
+                return "chroma_stft_complete"
+            except Exception as e:
+                print(f"Error in process_chroma_stft: {e}")
+                raise
 
-    del normalized_chroma_cqt
-    # op 14    
-    normalized_tonnetz = artifacts_gen.transform_to_tonnetz(y, metadata, True)
-    r.set(song_id, "76%")
-    if generate_video:
-        artifacts_gen.generate_tonnetz_graphs(normalized_tonnetz, server_data, song_id)
-        r.set(song_id, "78%")
-        artifacts_gen.generate_video(server_data, song_id, "tonnetz", sample_location)
-        r.set(song_id, "85%")
-    if generate_features:
-        artifacts_gen.save_feature_to_server_data("tonnetz", server_data, song_id, normalized_tonnetz)
-        r.set(song_id, "100%")
-    
-    del normalized_tonnetz
+        async def process_chroma_cens():
+            try:
+                normalized_chroma_cens = await loop.run_in_executor(None, artifacts_gen.transform_to_chroma, y_frames, metadata, "cens", True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
 
-    return {
-        "status": "success",
-        "message": "Signal transformed and server data populated successfully.",
-        "song_id": song_id,
-        "server_data": server_data
-    }
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_chroma_graphs, normalized_chroma_cens, "cens", server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "cens", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
+
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "chroma_cens", server_data, song_id, normalized_chroma_cens)
+                
+                del normalized_chroma_cens
+                return "chroma_cens_complete"
+            except Exception as e:
+                print(f"Error in process_chroma_cens: {e}")
+                raise
+
+        async def process_chroma_cqt():
+            try:
+                normalized_chroma_cqt = await loop.run_in_executor(None, artifacts_gen.transform_to_chroma, y_frames, metadata, "cqt", True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
+
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_chroma_graphs, normalized_chroma_cqt, "cqt", server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "cqt", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
+
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "chroma_cqt", server_data, song_id, normalized_chroma_cqt)
+
+                del normalized_chroma_cqt
+                return "chroma_cqt_complete"
+            except Exception as e:
+                print(f"Error in process_chroma_cqt: {e}")
+                raise
+
+        async def process_tonnetz():
+            try:
+                normalized_tonnetz = await loop.run_in_executor(None, artifacts_gen.transform_to_tonnetz, y_frames, metadata, True)
+                current = int(r.get(song_id) or 10)
+                r.set(song_id, str(min(current + 3, 100)))
+                
+                if generate_video:
+                    await loop.run_in_executor(None, artifacts_gen.generate_tonnetz_graphs, normalized_tonnetz, server_data, song_id)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 3, 100)))
+                    await loop.run_in_executor(None, artifacts_gen.generate_video, server_data, song_id, "tonnetz", sample_location)
+                    current = int(r.get(song_id) or 10)
+                    r.set(song_id, str(min(current + 4, 100)))
+                
+                if generate_features:
+                    await loop.run_in_executor(None, artifacts_gen.save_feature_to_server_data, "tonnetz", server_data, song_id, normalized_tonnetz)
+                
+                del normalized_tonnetz
+                return "tonnetz_complete"
+            except Exception as e:
+                print(f"Error in process_tonnetz: {e}")
+                raise
+
+        # Execute all 9 transformations in parallel using asyncio.gather
+        print(f"Starting parallel processing of {song_id}")
+        results = await asyncio.gather(
+            process_ft(),
+            process_spectr(),
+            process_mel_spectr(),
+            process_power_spectr(),
+            process_mfcc(),
+            process_chroma_stft(),
+            process_chroma_cens(),
+            process_chroma_cqt(),
+            process_tonnetz(),
+            return_exceptions=True
+        )
+
+        # Check for any errors
+        errors = [r for r in results if isinstance(r, Exception)]
+        if errors:
+            print(f"Errors during parallel processing: {errors}")
+            r.set(song_id, f"ERROR: {errors[0]}")
+            raise HTTPException(status_code=500, detail=f"Processing failed: {errors[0]}")
+
+        print(f"All transformations completed successfully: {results}")
+        
+        # Ensure final status is 100%
+        r.set(song_id, "100")
+
+        return {
+            "status": "success",
+            "message": "Signal transformed and server data populated successfully.",
+            "song_id": song_id,
+            "server_data": server_data
+        }
+
+    except Exception as e:
+        print(f"Error processing {song_id}: {e}")
+        r.set(song_id, f"ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
